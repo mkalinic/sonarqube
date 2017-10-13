@@ -21,14 +21,19 @@ package org.sonar.server.computation.task.projectanalysis.issue;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Map;
 import org.sonar.api.rule.RuleKey;
 import org.sonar.api.rule.RuleStatus;
 import org.sonar.core.issue.DefaultIssue;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
+import org.sonar.db.issue.IssueChangeDto;
 import org.sonar.db.issue.IssueMapper;
 import org.sonar.server.computation.task.projectanalysis.qualityprofile.ActiveRulesHolder;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
 
 public class ComponentIssuesLoader {
   private final DbClient dbClient;
@@ -41,7 +46,7 @@ public class ComponentIssuesLoader {
     this.ruleRepository = ruleRepository;
   }
 
-  public List<DefaultIssue> loadForComponentUuid(String componentUuid) {
+  public List<DefaultIssue> loadForComponentUuid(String componentUuid, boolean loadChanges) {
     try (DbSession dbSession = dbClient.openSession(false)) {
       List<DefaultIssue> result = new ArrayList<>();
       dbSession.getMapper(IssueMapper.class).scrollNonClosedByComponentUuid(componentUuid, resultContext -> {
@@ -57,8 +62,36 @@ public class ComponentIssuesLoader {
         issue.setSelectedAt(System.currentTimeMillis());
         result.add(issue);
       });
-      return result;
+
+      if (loadChanges) {
+        Map<String, List<IssueChangeDto>> changeDtoByIssueKey = dbClient.issueChangeDao()
+          .selectByIssueKeys(dbSession, result.stream().map(DefaultIssue::key).collect(toList()))
+          .stream()
+          .collect(groupingBy(IssueChangeDto::getIssueKey));
+
+        return result
+          .stream()
+          .peek(i -> setChanges(changeDtoByIssueKey, i))
+          .collect(toList());
+      } else {
+        return result;
+      }
     }
+  }
+
+  public static void setChanges(Map<String, List<IssueChangeDto>> changeDtoByIssueKey, DefaultIssue i) {
+    changeDtoByIssueKey.computeIfAbsent(i.key(), k -> emptyList()).forEach(c -> {
+      switch (c.getChangeType()) {
+        case IssueChangeDto.TYPE_FIELD_CHANGE:
+          i.addChange(c.toFieldDiffs());
+          break;
+        case IssueChangeDto.TYPE_COMMENT:
+          i.addComment(c.toComment());
+          break;
+        default:
+          throw new IllegalStateException("Unknow change type: " + c.getChangeType());
+      }
+    });
   }
 
   private boolean isActive(RuleKey ruleKey) {

@@ -80,7 +80,7 @@ public class TrackerBaseInputFactory {
 
     @Override
     protected List<DefaultIssue> loadIssues() {
-      return issuesLoader.loadForComponentUuid(effectiveUuid);
+      return issuesLoader.loadForComponentUuid(effectiveUuid, false);
     }
   }
 }
