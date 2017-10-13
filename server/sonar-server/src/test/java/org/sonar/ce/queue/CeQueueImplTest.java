@@ -41,7 +41,7 @@ import org.sonar.server.organization.TestDefaultOrganizationProvider;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.CoreMatchers.startsWith;
 
 public class CeQueueImplTest {
 

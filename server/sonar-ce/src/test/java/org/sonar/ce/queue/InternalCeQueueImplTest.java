@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import javax.annotation.Nullable;
-import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -527,7 +526,7 @@ public class InternalCeQueueImplTest {
   @Test
   public void fail_to_cancel_if_in_progress() throws Exception {
     expectedException.expect(IllegalStateException.class);
-    expectedException.expectMessage(Matchers.startsWith("Task is in progress and can't be canceled"));
+    expectedException.expectMessage("Task is in progress and can't be canceled");
 
     CeTask task = submit(CeTaskTypes.REPORT, "PROJECT_1");
     underTest.peek(WORKER_UUID_2);

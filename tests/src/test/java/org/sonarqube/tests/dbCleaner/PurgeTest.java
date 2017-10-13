@@ -43,7 +43,7 @@ import util.ItUtils;
 import static java.util.Collections.singletonList;
 import static org.apache.commons.lang.time.DateUtils.addDays;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static util.ItUtils.formatDate;
 import static util.ItUtils.newAdminWsClient;
 import static util.ItUtils.runProjectAnalysis;
