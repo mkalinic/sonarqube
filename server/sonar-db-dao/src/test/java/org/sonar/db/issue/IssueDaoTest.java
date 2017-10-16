@@ -33,6 +33,9 @@ import org.sonar.api.rule.RuleKey;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbTester;
 import org.sonar.db.RowNotFoundException;
+import org.sonar.db.component.BranchDao;
+import org.sonar.db.component.BranchDto;
+import org.sonar.db.component.BranchType;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ComponentTesting;
 import org.sonar.db.organization.OrganizationDto;
@@ -185,14 +188,23 @@ public class IssueDaoTest {
   @Test
   public void selectResolvedOrConfirmedByComponentUuid() {
     RuleDefinitionDto rule = db.rules().insert();
-    ComponentDto project = db.components().insertPrivateProject();
-    ComponentDto file = db.components().insertComponent(newFileDto(project));
-    IssueDto openIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_OPEN).setResolution(null));
-    IssueDto closedIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_CLOSED).setResolution(Issue.RESOLUTION_FIXED));
-    IssueDto reopenedIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_REOPENED).setResolution(null));
-    IssueDto confirmedIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_CONFIRMED).setResolution(null));
-    IssueDto wontfixIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_RESOLVED).setResolution(Issue.RESOLUTION_WONT_FIX));
-    IssueDto fpIssue = db.issues().insert(rule, project, file, i -> i.setStatus(Issue.STATUS_RESOLVED).setResolution(Issue.RESOLUTION_FALSE_POSITIVE));
+    ComponentDto projectBranch = db.components().insertPrivateProject();
+    ComponentDto file = db.components().insertComponent(newFileDto(projectBranch));
+
+    BranchDto dto = new BranchDto();
+    dto.setProjectUuid("rootProjectUUid");
+    dto.setUuid(projectBranch.uuid());
+    dto.setBranchType(BranchType.SHORT);
+    dto.setKey("feature/foo");
+    BranchDao branchDao = new BranchDao(System2.INSTANCE);
+    branchDao.insert(db.getSession(), dto);
+
+    IssueDto openIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_OPEN).setResolution(null));
+    IssueDto closedIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_CLOSED).setResolution(Issue.RESOLUTION_FIXED));
+    IssueDto reopenedIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_REOPENED).setResolution(null));
+    IssueDto confirmedIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_CONFIRMED).setResolution(null));
+    IssueDto wontfixIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_RESOLVED).setResolution(Issue.RESOLUTION_WONT_FIX));
+    IssueDto fpIssue = db.issues().insert(rule, projectBranch, file, i -> i.setStatus(Issue.STATUS_RESOLVED).setResolution(Issue.RESOLUTION_FALSE_POSITIVE));
 
     assertThat(underTest.selectResolvedOrConfirmedByComponentUuids(db.getSession(), Collections.singletonList(file.uuid())))
       .extracting("kee")
@@ -205,6 +217,14 @@ public class IssueDaoTest {
     ComponentDto project = db.components().insertPrivateProject();
     ComponentDto file = db.components().insertComponent(newFileDto(project));
     IssueDto fpIssue = db.issues().insert(rule, project, file, i -> i.setStatus("RESOLVED").setResolution("FALSE-POSITIVE"));
+
+    BranchDto dto = new BranchDto();
+    dto.setProjectUuid("rootProjectUUid");
+    dto.setUuid(project.uuid());
+    dto.setBranchType(BranchType.SHORT);
+    dto.setKey("feature/foo");
+    BranchDao branchDao = new BranchDao(System2.INSTANCE);
+    branchDao.insert(db.getSession(), dto);
 
     ShortBranchIssueDto fp = underTest.selectResolvedOrConfirmedByComponentUuids(db.getSession(), Collections.singletonList(file.uuid())).get(0);
     assertThat(fp.getLine()).isEqualTo(fpIssue.getLine());
