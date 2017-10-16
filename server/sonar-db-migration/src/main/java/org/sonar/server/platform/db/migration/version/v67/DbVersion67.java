@@ -28,6 +28,7 @@ public class DbVersion67 implements DbVersion {
   public void addSteps(MigrationStepRegistry registry) {
     registry
       .add(1830, "Copy deprecated server ID", CopyDeprecatedServerId.class)
+      .add(1831, "Cleanup disabled users", CleanupDisabledUsers.class)
     ;
   }
 }
