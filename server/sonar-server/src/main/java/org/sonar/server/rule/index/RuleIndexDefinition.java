@@ -146,7 +146,6 @@ public class RuleIndexDefinition implements IndexDefinition {
     ruleMapping.keywordFieldBuilder(FIELD_RULE_HTML_DESCRIPTION)
       .disableSearch()
       .disableNorms()
-      .disableSortingAndAggregating()
       .addSubFields(ENGLISH_HTML_ANALYZER)
       .build();
     ruleMapping.keywordFieldBuilder(FIELD_RULE_SEVERITY).disableNorms().build();

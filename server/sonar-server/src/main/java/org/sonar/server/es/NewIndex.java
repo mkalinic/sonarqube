@@ -376,7 +376,7 @@ public class NewIndex {
       hash.put("norms", "false");
       hash.put("store", valueOf(store));
       if (FIELD_TYPE_KEYWORD.equals(getFieldType())) {
-        hash.put("doc_values", valueOf(!disabledDocValues));
+        hash.put("doc_values", "false");
       }
       if (getFieldData()) {
         hash.put(FIELD_FIELDDATA, FIELDDATA_ENABLED);
