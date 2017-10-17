@@ -78,9 +78,6 @@ public class EditionInstaller {
 
   private void asyncInstall(Set<String> editionPluginKeys, UpdateCenter updateCenter) {
     try {
-      // TODO clean previously staged edition installations, or fail?
-      // editionPluginDownloader.cancelDownloads();
-      // editionPluginUninstaller.cancelUninstalls();
       editionPluginDownloader.installEdition(pluginsToInstall(editionPluginKeys), updateCenter);
       for (String pluginKey : pluginsToRemove(editionPluginKeys)) {
         editionPluginUninstaller.uninstall(pluginKey);
