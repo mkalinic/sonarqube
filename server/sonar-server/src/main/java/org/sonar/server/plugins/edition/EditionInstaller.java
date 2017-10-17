@@ -19,11 +19,14 @@
  */
 package org.sonar.server.plugins.edition;
 
+import com.google.common.base.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.sonar.core.platform.PluginInfo;
 import org.sonar.server.plugins.ServerPluginRepository;
+import org.sonar.server.plugins.UpdateCenterMatrixFactory;
+import org.sonar.updatecenter.common.UpdateCenter;
 
 public class EditionInstaller {
   private final ReentrantLock lock = new ReentrantLock();
@@ -31,23 +34,31 @@ public class EditionInstaller {
   private final EditionPluginDownloader editionPluginDownloader;
   private final EditionPluginUninstaller editionPluginUninstaller;
   private final ServerPluginRepository pluginRepository;
+  private final UpdateCenterMatrixFactory updateCenterMatrixFactory;
 
   public EditionInstaller(EditionPluginDownloader editionDownloader, EditionPluginUninstaller editionPluginUninstaller,
-    ServerPluginRepository pluginRepository, EditionInstallerExecutor executor) {
+    ServerPluginRepository pluginRepository, EditionInstallerExecutor executor, UpdateCenterMatrixFactory updateCenterMatrixFactory) {
     this.editionPluginDownloader = editionDownloader;
     this.editionPluginUninstaller = editionPluginUninstaller;
     this.pluginRepository = pluginRepository;
     this.executor = executor;
+    this.updateCenterMatrixFactory = updateCenterMatrixFactory;
   }
 
-  public void install(Set<String> editionPlugins) {
+  /**
+   * Refreshes the update center, and submits in a executor a task to download all the needed plugins (asynchronously).
+   * If the update center is disabled or if we are offline, the task is not submitted and false is returned. 
+   * @return true if a task was submitted to perform the download, false if update center is unavailable.
+   */
+  public boolean install(Set<String> editionPluginKeys) {
     if (lock.tryLock()) {
       try {
-        if (!requiresInstallationChange(editionPlugins)) {
-          return;
+        Optional<UpdateCenter> updateCenter = updateCenterMatrixFactory.getUpdateCenter(true);
+        if (!updateCenter.isPresent()) {
+          return false;
         }
-
-        executor.execute(() -> asyncInstall(editionPlugins));
+        executor.execute(() -> asyncInstall(editionPluginKeys, updateCenter.get()));
+        return true;
       } catch (RuntimeException e) {
         lock.unlock();
         throw e;
@@ -57,16 +68,20 @@ public class EditionInstaller {
     }
   }
 
+  public boolean isOffline() {
+    return updateCenterMatrixFactory.getUpdateCenter(true).isPresent();
+  }
+
   public boolean requiresInstallationChange(Set<String> editionPluginKeys) {
     return !pluginsToInstall(editionPluginKeys).isEmpty() || !pluginsToRemove(editionPluginKeys).isEmpty();
   }
 
-  private void asyncInstall(Set<String> editionPluginKeys) {
+  private void asyncInstall(Set<String> editionPluginKeys, UpdateCenter updateCenter) {
     try {
       // TODO clean previously staged edition installations, or fail?
       // editionPluginDownloader.cancelDownloads();
       // editionPluginUninstaller.cancelUninstalls();
-      editionPluginDownloader.installEdition(pluginsToInstall(editionPluginKeys));
+      editionPluginDownloader.installEdition(pluginsToInstall(editionPluginKeys), updateCenter);
       for (String pluginKey : pluginsToRemove(editionPluginKeys)) {
         editionPluginUninstaller.uninstall(pluginKey);
       }

@@ -19,7 +19,6 @@
  */
 package org.sonar.server.edition.ws;
 
-import java.util.Collections;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
@@ -27,6 +26,7 @@ import org.sonar.server.edition.EditionManagementState;
 import org.sonar.server.edition.License;
 import org.sonar.server.edition.MutableEditionManagementState;
 import org.sonar.server.exceptions.BadRequestException;
+import org.sonar.server.plugins.edition.EditionInstaller;
 import org.sonar.server.user.UserSession;
 import org.sonar.server.ws.WsUtils;
 import org.sonarqube.ws.WsEditions;
@@ -36,10 +36,12 @@ public class ApplyLicenseAction implements EditionsWsAction {
 
   private final UserSession userSession;
   private final MutableEditionManagementState editionManagementState;
+  private final EditionInstaller editionInstaller;
 
-  public ApplyLicenseAction(UserSession userSession, MutableEditionManagementState editionManagementState) {
+  public ApplyLicenseAction(UserSession userSession, MutableEditionManagementState editionManagementState, EditionInstaller editionInstaller) {
     this.userSession = userSession;
     this.editionManagementState = editionManagementState;
+    this.editionInstaller = editionInstaller;
   }
 
   @Override
@@ -65,14 +67,19 @@ public class ApplyLicenseAction implements EditionsWsAction {
       throw BadRequestException.create("Can't apply a license when applying one is already in progress");
     }
 
-    String license = request.mandatoryParam(PARAM_LICENSE);
-    License newLicense = new License(license, Collections.emptyList(), license);
-    if (license.contains("manual")) {
-      editionManagementState.startManualInstall(newLicense);
-    } else if (license.contains("done")) {
+    String licenseParam = request.mandatoryParam(PARAM_LICENSE);
+    License newLicense = License.parse(licenseParam).orElseThrow(() -> BadRequestException.create("The license provided is invalid"));
+
+    if (!editionInstaller.requiresInstallationChange(newLicense.getPluginKeys())) {
       editionManagementState.newEditionWithoutInstall(newLicense.getEditionKey());
+      // TODO install with license plugin
     } else {
-      editionManagementState.startAutomaticInstall(newLicense);
+      boolean online = editionInstaller.install(newLicense.getPluginKeys());
+      if (online) {
+        editionManagementState.startAutomaticInstall(newLicense);
+      } else {
+        editionManagementState.startManualInstall(newLicense);
+      }
     }
 
     WsUtils.writeProtobuf(buildResponse(), request, response);
